@@ -1,0 +1,59 @@
+stages:
+  - style
+  - build
+  - test
+  - deploy
+
+codestyle:
+  stage: style
+  tags: 
+    - style
+  script:
+    - clang-format -n -style=google src/**/*.c src/**/*.h # проверяем для отображения 
+    - clang-format -i -style=google src/**/*.c src/**/*.h # пробуем изменить
+    - git diff --exit-code # если изменяется то выходим из проверки 
+  after_script:
+    - bash src/telegram.sh 
+
+build_job:
+  stage: build
+  tags: 
+    - build
+  script:
+    - cd src/cat
+    - make s21_cat
+    - cd ../grep
+    - make s21_grep
+    - if [ $? -ne 0 ]; then exit 1; fi # проверяем код завершения
+  artifacts:
+    paths:
+      - src/cat/s21_cat
+      - src/grep/s21_grep
+    expire_in: 30 days
+  after_script:
+    - bash src/telegram.sh
+
+test_code:
+  stage: test
+  tags:
+    - test
+  script:
+    - cd src/cat
+    - make test 
+    - if [ $? -ne 0 ]; then exit 1; fi # проверяем код завершения
+    - cd ../grep
+    - make test
+    - if [ $? -ne 0 ]; then exit 1; fi # проверяем код завершения
+  after_script:
+    - bash src/telegram.sh
+
+deploy_artifacts:
+  stage: deploy
+  tags:
+    - deploy
+  script:
+    - chmod 777 src/deploy.sh
+    - bash src/deploy.sh
+  when: manual
+  after_script:
+    - bash src/telegram.sh
